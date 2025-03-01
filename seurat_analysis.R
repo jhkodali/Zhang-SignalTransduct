@@ -16,9 +16,40 @@ raw <- CreateSeuratObject(counts = raw.data, project = "zhang_signaltransduct")
 raw[["percent.mt"]] <- PercentageFeatureSet(raw, pattern = "^MT-")
 
 # qc metrics (nCount_RNA, nFeature_RNA, percent.mt)
+# nCount_RNA refers to number of RNA molecules detected in cell
+# nFeature_RNA refers to number of genes detected in cell
 head(raw@meta.data, 5)
 
 # visualize qc metrics
-VlnPlot(raw, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3, pt.size = FALSE)
+#VlnPlot(raw, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3, pt.size = FALSE)
 
 # normalize by library size
+# default: normalization.method = "LogNormalize", scale.factor = 10000
+raw <- NormalizeData(raw)
+
+# subset of features that exhibit high cell-to-cell variation
+# default: selection.method = "vst", nfeatures = 2000
+raw <- FindVariableFeatures(raw)
+top10 <- head(VariableFeatures(raw), 10)
+
+# plot variable features with and without labels
+plot1 <- VariableFeaturePlot(raw)
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+plot1 + plot2
+# top 10 variable features:
+# ICLC3, IGHG2, IGHM, IGHA2, IGLL5, IGHA1, CCL21, IGLC2, NTS, IGHG4
+# Non-variable count: 15277; Variable count: 2000
+
+
+# scaling after correcting technical covariates (total cellular read count and mitochondrial read count). 
+raw <- ScaleData(raw, vars.to.regress = "nCount_RNA, percent.mt")
+
+raw <- RunPCA(raw, features = VariableFeatures(object = raw))
+
+DimPlot(raw, reduction = "pca") + NoLegend()
+
+
+
+
+
+
