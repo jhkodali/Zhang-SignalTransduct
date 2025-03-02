@@ -42,14 +42,26 @@ plot1 + plot2
 
 
 # scaling after correcting technical covariates (total cellular read count and mitochondrial read count). 
-raw <- ScaleData(raw, vars.to.regress = "nCount_RNA, percent.mt")
+raw <- ScaleData(raw, vars.to.regress = c("nCount_RNA", "percent.mt"))
 
+# run PCA
 raw <- RunPCA(raw, features = VariableFeatures(object = raw))
 
+# PC1 vs PC2
 DimPlot(raw, reduction = "pca") + NoLegend()
 
+# see kind of an elbow around 30 PCs
+ElbowPlot(raw, ndims = 50)
 
+# Harmony Integration
 
-
+# raw <- FindNeighbors(raw, dims = 1:30)
+# # paper used 0.8 resolution
+# raw <- FindClusters(raw, resolution = 0.8)
+# 
+# raw <- RunUMAP(raw, dims = 1:30)
+# DimPlot(raw, reduction = "umap")
+# 
+# saveRDS(raw, file = "/restricted/projectnb/camplab/projects/Single_Cell_Public/Zhang_SignalTransductTargetTher_2022/Analysis/Seurat/zhang_signal_umap.rds")
 
 
