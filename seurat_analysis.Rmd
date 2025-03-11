@@ -1,0 +1,136 @@
+---
+title: "Seurat Analysis -  Zhang paper"
+author: "Jahnavi Kodali"
+date: "2025-03-08"
+output: html_document
+---
+
+Zhang et al. paper: https://pubmed.ncbi.nlm.nih.gov/35027529/
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libraries, include=FALSE}
+library(dplyr)
+library(Seurat)
+library(patchwork)
+library(harmony)
+```
+
+## Setting up Seurat object
+
+Loading in "dgCMatrix" of 17277 x 293432.  
+
+From the paper (supplementary materials), samples with less than 500 cells were removed. Cells were required to have more than 1000 UMIs and only genes with more than 1000 UMIs across all cells which left 293,432 cells and 17,277 genes.
+
+
+```{r data}
+raw.data <- readRDS('/restricted/projectnb/camplab/projects/Single_Cell_Public/Zhang_SignalTransductTargetTher_2022/Data/raw_data.rds')
+
+raw <- CreateSeuratObject(counts = raw.data, project = "zhang_signaltransduct")
+
+# percentage of reads that map to the mitochondrial genome 
+raw[["percent.mt"]] <- PercentageFeatureSet(raw, pattern = "^MT-")
+```
+
+QC metrics (nCount_RNA, nFeature_RNA, percent.mt)  
+nCount_RNA refers to number of RNA molecules detected in cell  
+nFeature_RNA refers to number of genes detected in cell  
+
+```{r}
+head(raw@meta.data, 5)
+```
+
+## Normalization
+
+Normalize by library size
+Default: normalization.method = "LogNormalize", scale.factor = 10000
+
+```{r normalization}
+raw <- NormalizeData(raw)
+```
+
+## Variable Features
+
+Finding subset of features that exhibit high cell-to-cell variation
+Default: selection.method = "vst", nfeatures = 2000
+
+```{r variable features}
+raw <- FindVariableFeatures(raw)
+top10 <- head(VariableFeatures(raw), 10)
+print(top10)
+```
+
+**Plot variable features with and without labels**
+
+Top 10 variable features:  
+ICLC3, IGHG2, IGHM, IGHA2, IGLL5, IGHA1, CCL21, IGLC2, NTS, IGHG4  
+Non-variable count: 15277; Variable count: 2000  
+Not exactly sure how paper got 1981 variable features  
+
+```{r plot variable features, echo=FALSE}
+plot1 <- VariableFeaturePlot(raw)
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+plot1 + plot2
+```
+
+## Scaling 
+
+Correcting technical covariates (total cellular read count and mitochondrial read count). 
+
+```{r scaling}
+raw <- ScaleData(raw, vars.to.regress = c("nCount_RNA", "percent.mt"))
+```
+
+## PCA
+
+```{r pca}
+raw <- RunPCA(raw, features = VariableFeatures(object = raw))
+```
+
+```{r plot pca, echo=FALSE}
+DimPlot(raw, reduction = "pca") + NoLegend()
+```
+
+Elbow plot shows an elbow around 30 PCs
+
+```{r elbow, echo=FALSE}
+ElbowPlot(raw, ndims = 50)
+```
+
+## Harmony 
+
+Not yet sure how to implement this since the data given doesn't have a batch attribute.  
+
+```{r harmony, eval=FALSE, include=FALSE}
+# raw <- IntegrateLayers(object = raw, method = HarmonyIntegration, orig.reduction = "pca",
+#                        new.reduction = 'harmony', verbose = FALSE)
+# raw <- RunHarmony(raw, dims = 1:30, project.dim = TRUE)
+```
+
+## Clustering
+
+For now, skipping harmony.  
+
+Paper used 0.8 resolution for FindClusters.  
+
+```{r clustering}
+raw <- FindNeighbors(raw, dims = 1:30)
+
+raw <- FindClusters(raw, resolution = 0.8)
+```
+
+## UMAP
+
+Identifies 42 clusters.
+
+```{r umap}
+raw <- RunUMAP(raw, dims = 1:30)
+DimPlot(raw, reduction = "umap")
+```
+
+```{r save, include=FALSE}
+saveRDS(raw, file = "/restricted/projectnb/camplab/projects/Single_Cell_Public/Zhang_SignalTransductTargetTher_2022/Analysis/Seurat/zhang_signal_umap.rds")
+```
+
